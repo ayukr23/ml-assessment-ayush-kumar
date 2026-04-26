@@ -8,8 +8,6 @@
 
 This is a **supervised, multi-class classification problem**. The goal is to learn a mapping from store and context features to the promotion type that maximises items sold, enabling the marketing team to deploy the optimal promotion for each store each month.
 
-| ML Component | Definition for This Problem |
-
 | **Target Variable (y)** | Optimal promotion type — one of: Flat Discount, BOGO, Free Gift with Purchase, Category-Specific Offer, Loyalty Points Bonus (5 classes) |
 | **Input Features (X)** | Store size, location type (urban/semi-urban/rural), monthly footfall, local competition density, customer demographics (age, income bracket), month/season, is_weekend, is_festival flag |
 | **Problem Type** | Multi-class classification — five discrete promotion labels, one chosen per store per month |
@@ -20,12 +18,6 @@ This is a **supervised, multi-class classification problem**. The goal is to lea
 
 Using total sales revenue as the target variable introduces a confound: revenue is the product of items sold and price. Two promotions may sell the same volume, but one sells higher-priced items, making revenue misleading about which promotion drove customer engagement. Conversely, a deep discount may inflate revenue purely through price reduction while depressing margins.
 
-| Metric | Total Sales Revenue | Items Sold (Volume) |
-
-| Captures promotion pull? | Indirectly — conflated with price | Directly — pure demand signal |
-| Sensitive to markdowns? | Yes — deep discounts distort it | No — price-independent |
-| Reflects footfall conversion? | Partially | Yes — each sale = one unit |
-| Actionable for marketing? | Less — pricing team owns it | Yes — marketing drives volume |
 
 **Broader Principle — Target Variable Selection:**
 
@@ -39,8 +31,6 @@ The target variable must be the most direct, least-confounded proxy for the busi
 A junior analyst's proposal of a single global model assumes homogeneity: that the effect of each promotion type is the same across all 50 stores. This is unlikely — an urban flagship store with 10,000 monthly footfall and affluent demographics will respond very differently to a Loyalty Points Bonus than a small rural outlet with 400 monthly visitors.
 
 **Proposed Alternative: Hierarchical / Segmented Modelling**
-
-| Strategy | Description | Best For |
 
 | **Segment-level models** | Train one model per location type (urban, semi-urban, rural). Each model learns promotion responses within its segment. | When segments are large enough (≥200 records each) and location type is the key heterogeneity driver |
 | **Store-level models with global prior** | Train a global model, then fine-tune per store using local data (hierarchical Bayesian or transfer learning). Global model provides stability; local fine-tuning captures idiosyncrasies. | When individual stores have limited history (cold-start problem). Balances bias and variance |
@@ -73,7 +63,7 @@ Generate a complete (store_id × year_month) grid covering every store for every
 - **Total items_sold** per store per month (target variable and feature for lag engineering)
 - **Dominant promotion_type** per store per month (mode of daily promotion, or as provided by the promotion schedule)
 - **Monthly footfall** — sum or average daily footfall transactions
-- **festival_days_in_month** — count of festival days (not just binary flag) for richer signal
+- **festival_days_in_month** — count of festival days for richer signal
 - **Lag features** — items_sold in t-1 and t-2 months, rolling 3-month average, to capture momentum
 - **competition_density** — taken as-is from store attributes (assumed static or slowly varying)
 
@@ -90,8 +80,6 @@ The following four analyses are performed before modelling, each with a specific
 | **2** | **Heatmap: Avg. Items Sold by Month × Promotion Type** | Identify seasonality interactions — does Flat Discount work better in January (post-festive clearance) but Loyalty Points work better mid-year? | Drives feature engineering decisions: month, quarter, and season must be included as features. May reveal that certain promotions should be locked to certain seasons |
 | **3** | **Footfall vs. Items Sold Scatter** (coloured by promotion) | Is the relationship linear? Do high-footfall stores benefit more from certain promotion types (conversion-rate vs. awareness effect)? | Guides whether footfall × promotion interaction terms are needed. May justify a log-transform of footfall if the relationship is sub-linear |
 | **4** | **Correlation Heatmap** (numeric features vs. items_sold) | Check for multicollinearity (e.g., store_size and footfall likely correlated). Identify which numeric features have the strongest individual signal. | Features with correlation > 0.8 to each other may need to be de-duplicated (keep one or apply PCA). Weak-signal features (\|r\| < 0.05) are candidates for removal |
-
-> **Bonus EDA — Promotion Rotation Frequency:** Plot a Sankey or sequence diagram showing how often stores change promotion month-to-month. If stores use the same promotion for 6+ consecutive months, this introduces temporal autocorrelation that a naive i.i.d. model will ignore. This finding would motivate adding a `months_on_same_promo` lag feature.
 
 
 ## (c) Handling 80% No-Promotion Transactions
